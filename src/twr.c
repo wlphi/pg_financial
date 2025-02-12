@@ -66,15 +66,20 @@ twr_tstz_transfn(PG_FUNCTION_ARGS)
         PG_RETURN_POINTER(state);
 
     /* Expand array if needed */
-    if (state->nelems >= state->alen) {
-        if (!AggCheckCallContext(fcinfo, &aggcontext))
-            elog(ERROR, "twr_tstz_transfn called in non-aggregate context");
+   if (state->nelems >= state->alen) {
+    if (!AggCheckCallContext(fcinfo, &aggcontext))
+        elog(ERROR, "twr_tstz_transfn called in non-aggregate context");
 
-        oldcontext = MemoryContextSwitchTo(aggcontext);
-        state->alen *= 2;
-        state = repalloc(state, sizeof(TwrState) + state->alen * sizeof(TwrItem));
-        MemoryContextSwitchTo(oldcontext);
-    }
+    oldcontext = MemoryContextSwitchTo(aggcontext);
+    
+    /* DOUBLE THE SIZE SAFELY */
+    int new_size = state->alen * 2;
+    state = repalloc(state, sizeof(TwrState) + new_size * sizeof(TwrItem));
+    state->alen = new_size;
+    
+    MemoryContextSwitchTo(oldcontext);
+  }
+
 
     state->array[state->nelems].market_value = market_value;
     state->array[state->nelems].time = time;
@@ -93,33 +98,50 @@ twr_tstz_finalfn(PG_FUNCTION_ARGS)
     double twr = 1.0;
     int i;
 
+    /* Ensure the input state is not NULL */
     if (PG_ARGISNULL(0))
         PG_RETURN_NULL();
 
     state = (TwrState *) PG_GETARG_POINTER(0);
 
-    if (state->nelems < 2)
+    /* Ensure we have at least 2 data points */
+    if (state->nelems < 2) {
+        elog(WARNING, "TWR calculation requires at least two data points");
         PG_RETURN_NULL();
+    }
+
+    elog(DEBUG1, "Calculating TWR over %d records", state->nelems);
 
     /* Calculate compounded returns */
     for (i = 1; i < state->nelems; i++) {
         double previous_value = state->array[i - 1].market_value;
         double current_value = state->array[i].market_value;
 
+        elog(DEBUG1, "Iteration %d: prev=%g, curr=%g", i, previous_value, current_value);
+
+        /* Prevent invalid portfolio values */
         if (previous_value <= 0.0) {
+            elog(ERROR, "Invalid portfolio value: %g at index %d", previous_value, i - 1);
             ereport(ERROR, (errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
-                            errmsg("Portfolio values must be positive")));
+                            errmsg("Portfolio values must be positive and non-zero")));
         }
 
         double sub_period_return = (current_value - previous_value) / previous_value;
 
-        if (isinf(sub_period_return) || isnan(sub_period_return)) {
+        /* Check for floating-point issues */
+        if (!isfinite(sub_period_return)) {
+            elog(ERROR, "Sub-period return produced invalid value: %g", sub_period_return);
             ereport(ERROR, (errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
-                            errmsg("Calculation resulted in invalid value")));
+                            errmsg("Calculation resulted in invalid value (NaN or Inf)")));
         }
 
         twr *= (1.0 + sub_period_return);
     }
+
+    elog(DEBUG1, "Final TWR result: %g", twr - 1.0);
+    PG_RETURN_FLOAT8(twr - 1.0);
+}
+
 
     PG_RETURN_FLOAT8(twr - 1.0);
 }

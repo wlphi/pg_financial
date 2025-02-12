@@ -1,5 +1,5 @@
+DROP EXTENSION IF EXISTS financial CASCADE;
 CREATE EXTENSION financial;
-
 SET extra_float_digits = -4;
 -- SET client_min_messages = 'debug';
 

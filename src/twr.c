@@ -15,8 +15,6 @@
 #include "utils/timestamp.h"
 #include "fmgr.h"
 
-PG_MODULE_MAGIC;
-
 /**** Declarations */
 
 typedef struct TwrItem

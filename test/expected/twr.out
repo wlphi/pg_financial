@@ -1,25 +1,37 @@
-test_name    | twr_result | test_result 
----------------+------------+-------------
- regression_case |     0.1010 | t
- same_day       |     0.1000 | t
- simple_case    |     0.2100 | t
- single_row     |            | t
- with_flows     |     0.2500 | t
- zero_value     |            | t
-(6 rows)
-
--- Empty set test result
- twr 
------
-     
+appreciation_test 
+------------------
+           0.5000
 (1 row)
 
--- NULL test results
+ depreciation_test 
+------------------
+          -0.2000
+(1 row)
+
+ no_change_test 
+---------------
+         0.0000
+(1 row)
+
+ volatility_test 
+----------------
+          1.5000
+(1 row)
+
+ single_point_test 
+------------------
+                 
+(1 row)
+
 ERROR:  twr amount input cannot be NULL
 ERROR:  twr value input cannot be NULL
-ERROR:  twr timestamp input cannot be NULL
-ERROR:  twr amount input cannot be NULL
-ERROR:  twr amount input cannot be NULL
-ERROR:  twr value input cannot be NULL
-ERROR:  twr amount input cannot be NULL
-NOTICE:  All NULL tests passed successfully
+
+ERROR:  array length mismatch - actual length 2, expected 1
+
+ERROR:  portfolio values must be positive
+ERROR:  portfolio values must be positive
+
+ precision_test 
+---------------
+         0.0010
+(1 row)

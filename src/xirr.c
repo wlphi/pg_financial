@@ -17,8 +17,6 @@
 
 /**** Declarations */
 
-PG_MODULE_MAGIC;
-
 typedef struct XirrItem
 {
 	double		amount;

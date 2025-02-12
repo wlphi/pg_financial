@@ -1,111 +1,100 @@
-\set QUIET 1
--- Adjust precision settings for consistent test output
-SET extra_float_digits = 0;
+\set VERBOSITY verbose
 
--- Create a temporary table for test data
-CREATE TEMP TABLE test_twr (
-    asset_id TEXT,
-    flow_date TIMESTAMPTZ,
-    market_value FLOAT8
+-- Setup test tables
+CREATE TEMPORARY TABLE twr_test (
+    test_name text,
+    amount double precision,
+    value double precision,
+    ts timestamptz
 );
 
--- Insert test cases
-INSERT INTO test_twr VALUES
-    ('A', '2023-01-01', 1000.0),
-    ('A', '2023-06-01', 1200.0),
-    ('A', '2023-12-31', 1500.0);
+-- Test cases
+INSERT INTO twr_test VALUES
+    ('appreciation_test', -1000, 1000, '2023-01-01'),
+    ('appreciation_test', 0, 1500, '2023-02-01');
 
--- Test basic TWR calculation with appreciation
-SELECT round(twr(market_value, flow_date)::numeric, 4) AS appreciation_test
-FROM test_twr
-GROUP BY asset_id;
+INSERT INTO twr_test VALUES
+    ('depreciation_test', -1000, 1000, '2023-01-01'),
+    ('depreciation_test', 0, 800, '2023-02-01');
 
--- Reset table and insert depreciation case
-TRUNCATE test_twr;
-INSERT INTO test_twr VALUES
-    ('B', '2023-01-01', 1000.0),
-    ('B', '2023-06-01', 900.0),
-    ('B', '2023-12-31', 800.0);
+INSERT INTO twr_test VALUES
+    ('no_change_test', -1000, 1000, '2023-01-01'),
+    ('no_change_test', 0, 1000, '2023-02-01');
 
--- Test TWR with depreciation
-SELECT round(twr(market_value, flow_date)::numeric, 4) AS depreciation_test
-FROM test_twr
-GROUP BY asset_id;
+INSERT INTO twr_test VALUES
+    ('volatility_test', -1000, 1000, '2023-01-01'),
+    ('volatility_test', 0, 2500, '2023-02-01');
 
--- Reset table and insert no-change case
-TRUNCATE test_twr;
-INSERT INTO test_twr VALUES
-    ('C', '2023-01-01', 1000.0),
-    ('C', '2023-06-01', 1000.0),
-    ('C', '2023-12-31', 1000.0);
+INSERT INTO twr_test VALUES
+    ('single_point_test', -1000, 1000, '2023-01-01');
 
--- Test TWR with no value change
-SELECT round(twr(market_value, flow_date)::numeric, 4) AS no_change_test
-FROM test_twr
-GROUP BY asset_id;
+INSERT INTO twr_test VALUES
+    ('precision_test', -1000, 1000, '2023-01-01'),
+    ('precision_test', 0, 1001, '2023-02-01');
 
--- Reset table and insert large fluctuations
-TRUNCATE test_twr;
-INSERT INTO test_twr VALUES
-    ('D', '2023-01-01', 1000.0),
-    ('D', '2023-06-01', 5000.0),
-    ('D', '2023-12-31', 2500.0);
+-- Run basic tests
+SELECT test_name, 
+       round(twr(amount, value, ts)::numeric, 4) as twr_result
+FROM twr_test
+WHERE test_name = 'appreciation_test'
+GROUP BY test_name;
 
--- Test TWR with large fluctuations
-SELECT round(twr(market_value, flow_date)::numeric, 4) AS volatility_test
-FROM test_twr
-GROUP BY asset_id;
+SELECT test_name, 
+       round(twr(amount, value, ts)::numeric, 4) as twr_result
+FROM twr_test
+WHERE test_name = 'depreciation_test'
+GROUP BY test_name;
 
--- Reset table and insert single-point test (expect NULL)
-TRUNCATE test_twr;
-INSERT INTO test_twr VALUES
-    ('E', '2023-01-01', 1000.0);
+SELECT test_name, 
+       round(twr(amount, value, ts)::numeric, 4) as twr_result
+FROM twr_test
+WHERE test_name = 'no_change_test'
+GROUP BY test_name;
 
--- Test single data point (expect NULL)
-SELECT twr(market_value, flow_date) AS single_point_test
-FROM test_twr
-GROUP BY asset_id;
+SELECT test_name, 
+       round(twr(amount, value, ts)::numeric, 4) as twr_result
+FROM twr_test
+WHERE test_name = 'volatility_test'
+GROUP BY test_name;
 
--- Error case tests
-\set ON_ERROR_STOP 0
+SELECT test_name, 
+       round(twr(amount, value, ts)::numeric, 4) as twr_result
+FROM twr_test
+WHERE test_name = 'single_point_test'
+GROUP BY test_name;
 
--- Test NULL inputs
-SELECT twr(NULL, flow_date) AS null_values_test
-FROM test_twr
-GROUP BY asset_id;
+-- NULL tests
+SELECT twr(NULL::double precision, 1000, '2023-01-01'::timestamptz);
+SELECT twr(1000, NULL::double precision, '2023-01-01'::timestamptz);
 
-SELECT twr(market_value, NULL) AS null_dates_test
-FROM test_twr
-GROUP BY asset_id;
+-- Array length mismatch test
+SELECT twr(-1000, 1000, '2023-01-01'::timestamptz) 
+FROM (VALUES (1), (2)) t;
 
--- Test zero values
-TRUNCATE test_twr;
-INSERT INTO test_twr VALUES
-    ('F', '2023-01-01', 0.0),
-    ('F', '2023-06-01', 1000.0);
+-- Invalid value tests
+INSERT INTO twr_test VALUES
+    ('negative_value_test', -1000, -1000, '2023-01-01'),
+    ('negative_value_test', 0, 1000, '2023-02-01');
 
-SELECT twr(market_value, flow_date) AS zero_value_test
-FROM test_twr
-GROUP BY asset_id;
+SELECT test_name, 
+       round(twr(amount, value, ts)::numeric, 4) as twr_result
+FROM twr_test
+WHERE test_name = 'negative_value_test'
+GROUP BY test_name;
 
--- Test negative values
-TRUNCATE test_twr;
-INSERT INTO test_twr VALUES
-    ('G', '2023-01-01', 1000.0),
-    ('G', '2023-06-01', -1000.0);
+INSERT INTO twr_test VALUES
+    ('zero_value_test', -1000, 0, '2023-01-01'),
+    ('zero_value_test', 0, 1000, '2023-02-01');
 
-SELECT twr(market_value, flow_date) AS negative_value_test
-FROM test_twr
-GROUP BY asset_id;
+SELECT test_name, 
+       round(twr(amount, value, ts)::numeric, 4) as twr_result
+FROM twr_test
+WHERE test_name = 'zero_value_test'
+GROUP BY test_name;
 
-\set ON_ERROR_STOP 1
-
--- Test precision with small changes
-TRUNCATE test_twr;
-INSERT INTO test_twr VALUES
-    ('H', '2023-01-01', 1000.0),
-    ('H', '2023-06-01', 1001.0);
-
-SELECT round(twr(market_value, flow_date)::numeric, 4) AS precision_test
-FROM test_twr
-GROUP BY asset_id;
+-- Precision test
+SELECT test_name, 
+       round(twr(amount, value, ts)::numeric, 4) as twr_result
+FROM twr_test
+WHERE test_name = 'precision_test'
+GROUP BY test_name;

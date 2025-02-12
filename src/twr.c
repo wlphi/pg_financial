@@ -3,8 +3,6 @@
 #include "utils/timestamp.h"
 #include <math.h>
 
-PG_MODULE_MAGIC;
-
 /*
  * Structure to accumulate values for TWR calculation
  */

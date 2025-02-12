@@ -1,0 +1,34 @@
+round  
+--------
+ 0.5000
+(1 row)
+
+ round  
+--------
+-0.2000
+(1 row)
+
+ round  
+--------
+ 0.0000
+(1 row)
+
+ round  
+--------
+ 1.5000
+(1 row)
+
+ twr
+-----
+
+(1 row)
+
+ERROR:  NULL arrays are not allowed as input
+ERROR:  NULL arrays are not allowed as input
+ERROR:  Date and value arrays must have the same length
+ERROR:  Portfolio values must be positive
+ERROR:  Portfolio values must be positive
+ round  
+--------
+ 0.0010
+(1 row)

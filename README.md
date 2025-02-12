@@ -1,92 +1,56 @@
-# pg_financial: Financial Functions for PostgreSQL
+PostgreSQL Financial Extension
 
-## Overview
-`pg_financial` is a PostgreSQL extension providing financial functions, including `XIRR` (Extended Internal Rate of Return) and `TWR` (Time-Weighted Return), optimized for large-scale portfolio and investment analytics.
+PGXN version Tests status
 
-## Features
-- **XIRR**: Calculates the internal rate of return for irregular cash flows.
-- **TWR**: Computes time-weighted returns, useful for performance measurement without cash flow bias.
+This is a PostgreSQL extension for financial calculations.
 
-## Installation
-### Prerequisites
-Ensure you have PostgreSQL installed along with development tools:
-```sh
-sudo apt install postgresql-server-dev-XX # Replace XX with your PostgreSQL version
-```
+Functions provided:
 
-### Build and Install
-```sh
-git clone https://github.com/intgr/pg_financial.git
-cd pg_financial
-make
-make install
-```
+    xirr(amounts, dates [, guess]) - Irregular Internal Rate of Return. Aggregate function, much like XIRR in spreadsheet programs (Excel, LibreOffice, etc).
+    twr(amount, portfolio_value, timestamp) - requires cashflow amount, portfolio value and timestamp for every cashflow plus the current date (where cashflow may be zero)
 
-### Enable Extension
-```sql
-CREATE EXTENSION pg_financial;
-```
+Installation
 
-## Usage
-### XIRR Calculation
-```sql
-SELECT xirr(
-    ARRAY[date '2023-01-01', date '2023-06-01', date '2023-12-31'],
-    ARRAY[-1000.0, 200.0, 1500.0]
-);
-```
+pg_financial is tested with PostgreSQL versions from 10 to 15.
 
-### TWR Calculation
-```sql
-SELECT twr(
-    ARRAY[date '2023-01-01', date '2023-06-01', date '2023-12-31'],
-    ARRAY[1000.0, 1200.0, 1500.0]
-);
-```
+To build and install this extension, simply run:
 
-## Example Queries
-### Compute XIRR for Financial Assets
-```sql
-WITH cash_flows_combined AS (
-    SELECT asset_id, flow_date, amount FROM cash_flows
-    UNION ALL
-    SELECT asset_id, price_date AS flow_date, market_value AS amount FROM asset_prices
-)
-SELECT asset_id,
-       xirr(
-           ARRAY_AGG(flow_date ORDER BY flow_date),
-           ARRAY_AGG(amount ORDER BY flow_date)
-       ) AS irr
-FROM cash_flows_combined
-GROUP BY asset_id;
-```
+% make
+% sudo make install
 
-### Compute TWR for Financial Assets
-```sql
-WITH asset_values AS (
-    SELECT asset_id, flow_date, market_value FROM asset_prices
-    UNION ALL
-    SELECT asset_id, flow_date, amount AS market_value FROM cash_flows
-)
-SELECT asset_id,
-       twr(
-           ARRAY_AGG(flow_date ORDER BY flow_date),
-           ARRAY_AGG(market_value ORDER BY flow_date)
-       ) AS twr
-FROM asset_values
-GROUP BY asset_id;
-```
+Then, to activate this extension in your database, run the SQL:
 
-## Performance Considerations
-- Implemented in **C** for high efficiency.
-- Uses **array-based processing** to avoid expensive window functions.
-- Suitable for large-scale financial datasets.
+CREATE EXTENSION financial;
 
-## Contributions
-Pull requests are welcome! To contribute:
-1. Fork the repository.
-2. Implement improvements or bug fixes.
-3. Submit a PR with detailed explanations.
+If you run into problems with building, see PostgreSQL wiki for troubleshooting
+xirr aggregate function
+
+The basic form of the XIRR function is: xirr(amounts, dates [, guess])
+
+Since XIRR is fundamentally an imprecise function, amounts is of type float8 (double precision). dates is timestamp with time zone.
+
+For example, if table transaction has columns amount and time, do this:
+
+db=# SELECT xirr(amount, time ORDER BY time) FROM transaction;
+        xirr        
+--------------------
+ 0.0176201237088334
+
+The guess argument (also float8) is an optional initial guess. When omitted, the function will use annualized return as the guess, which is usually reliable. Excel and LibreOffice, however, use a guess of 0.1 by default:
+
+SELECT xirr(amount, time, 0.1 ORDER BY time) FROM transaction;
+
+Like any aggregate function, you can use xirr with GROUP BY or as a window function, e.g:
+
+SELECT portfolio, xirr(amount, time ORDER BY time)
+    FROM transaction GROUP BY portfolio;
+
+SELECT xirr(amount, time) OVER (ORDER BY time)
+    FROM transaction;
+
+There are situations where XIRR (Newton's method) fails to arrive at a result. In these cases, the function returns NULL. Sometimes providing a better guess helps, but some inputs are simply indeterminate.
+
+Because XIRR needs to do multiple passes over input data, all inputs to the aggregate function are held in memory (16 bytes per row). Beware that this can cause the server to run out of memory with extremely large data sets.
 
 ## License
 See `LICENSE` for details.

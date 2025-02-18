@@ -1,56 +1,95 @@
-PostgreSQL Financial Extension
+I'll help improve the README formatting and organization. Here's the updated version:
 
-PGXN version Tests status
+# PostgreSQL Financial Extension
 
 This is a PostgreSQL extension for financial calculations.
 
-Functions provided:
+## Functions Provided
 
-    xirr(amounts, dates [, guess]) - Irregular Internal Rate of Return. Aggregate function, much like XIRR in spreadsheet programs (Excel, LibreOffice, etc).
-    twr(amount, portfolio_value, timestamp) - requires cashflow amount, portfolio value and timestamp for every cashflow plus the current date (where cashflow may be zero)
+* `xirr(amounts, dates [, guess])` - Irregular Internal Rate of Return. Aggregate function, similar to XIRR in spreadsheet programs (Excel, LibreOffice, etc).
+* `twr(amount, portfolio_value, timestamp)` - Time-Weighted Return calculation that requires cashflow amount, portfolio value and timestamp for every cashflow plus the current date (where cashflow may be zero).
 
-Installation
+## Installation
 
 pg_financial is tested with PostgreSQL versions from 10 to 15.
 
-To build and install this extension, simply run:
+To build and install this extension:
 
-% make
-% sudo make install
+```bash
+make
+sudo make install
+```
 
-Then, to activate this extension in your database, run the SQL:
+Then, activate the extension in your database:
 
+```sql
 CREATE EXTENSION financial;
+```
 
-If you run into problems with building, see PostgreSQL wiki for troubleshooting
-xirr aggregate function
+If you encounter build problems, please see the [PostgreSQL wiki](wiki_link) for troubleshooting.
 
-The basic form of the XIRR function is: xirr(amounts, dates [, guess])
+## Usage
 
-Since XIRR is fundamentally an imprecise function, amounts is of type float8 (double precision). dates is timestamp with time zone.
+### XIRR Aggregate Function
 
-For example, if table transaction has columns amount and time, do this:
+The basic form of the XIRR function is: `xirr(amounts, dates [, guess])`
 
-db=# SELECT xirr(amount, time ORDER BY time) FROM transaction;
+Since XIRR is fundamentally an imprecise function, `amounts` is of type `float8` (double precision). `dates` is `timestamp with time zone`.
+
+Basic example using a transaction table with columns `amount` and `time`:
+
+```sql
+SELECT xirr(amount, time ORDER BY time) FROM transaction;
+```
+
+Example output:
+```
         xirr        
 --------------------
  0.0176201237088334
+```
 
-The guess argument (also float8) is an optional initial guess. When omitted, the function will use annualized return as the guess, which is usually reliable. Excel and LibreOffice, however, use a guess of 0.1 by default:
+The `guess` argument (also `float8`) is an optional initial guess. When omitted, the function uses annualized return as the guess, which is usually reliable. Excel and LibreOffice use a default guess of 0.1:
 
+```sql
 SELECT xirr(amount, time, 0.1 ORDER BY time) FROM transaction;
+```
 
-Like any aggregate function, you can use xirr with GROUP BY or as a window function, e.g:
+### Advanced Usage
 
+Like any aggregate function, you can use xirr with GROUP BY or as a window function:
+
+```sql
 SELECT portfolio, xirr(amount, time ORDER BY time)
     FROM transaction GROUP BY portfolio;
 
 SELECT xirr(amount, time) OVER (ORDER BY time)
     FROM transaction;
+```
 
-There are situations where XIRR (Newton's method) fails to arrive at a result. In these cases, the function returns NULL. Sometimes providing a better guess helps, but some inputs are simply indeterminate.
+### Important Notes
 
-Because XIRR needs to do multiple passes over input data, all inputs to the aggregate function are held in memory (16 bytes per row). Beware that this can cause the server to run out of memory with extremely large data sets.
+* There are situations where XIRR (Newton's method) fails to arrive at a result. In these cases, the function returns NULL. Sometimes providing a better guess helps, but some inputs are simply indeterminate.
+* Because XIRR needs multiple passes over input data, all inputs to the aggregate function are held in memory (16 bytes per row). Be cautious with extremely large datasets to avoid server memory issues.
+
+### TWR Function
+
+The Time-Weighted Return function is implemented as:
+TWR (Time-Weighted Return)
+The twr(amount, portfolio_value, timestamp) aggregate function calculates time-weighted returns. It requires:
+* Cashflow amount (cashflow may be zero)
+* Portfolio value
+* Timestamp for each cashflow
+
+```sql
+SELECT twr(amt, val, ts) OVER (ORDER BY ts)
+FROM (VALUES
+    (-1000::double precision, 1000::double precision, '2023-01-01'::timestamptz),
+    (-500::double precision, 1600::double precision, '2023-02-01'),
+    (200::double precision, 1500::double precision, '2023-03-01')
+) x(amt, val, ts);
+```
 
 ## License
+
 See `LICENSE` for details.

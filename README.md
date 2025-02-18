@@ -131,9 +131,8 @@ FROM (VALUES
     (200::double precision, 1500::double precision, '2023-03-01')
 ) x(amt, val, ts);
 ```
-Here's the markdown code formatted for easy copying:
 
-### Time-Weighted Return (TWR) Calculation
+### Time-Weighted Return (TWR) Calculation for Portfolios
 
 TWR calculations support portfolio-level analysis by aggregating transactions across multiple assets. Key points:
 
